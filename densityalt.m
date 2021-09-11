@@ -20,7 +20,7 @@ function h = densityalt(rho,varargin)
 %                      [fzero | bisection | analytical]
 %                      (fzero only for scalar case)
 %                      Interpolate: any method accepted by interp1 e.g. 'pchip'.
-%                      Default method is 'pchip' for interpolation.
+%                      Default method is 'analytical'.
 %     options        - Options used for fzero or bisection methods.
 %     hMin           - For search: lower search interval bound in meters. 
 %                      For interpolation: start of generated interpolation grid.
@@ -86,7 +86,7 @@ p.addParameter('outputUnits','SI');
 p.addParameter('atmosphereFunction','atmos');
 p.addParameter('atmosphereArgs',{},@iscell);
 
-p.addParameter('method','pchip'); 
+p.addParameter('method','analytical');
 % Possibilities are exact matches of 'analytical', 'fzero' or 'bisection',
 % or an interp1 method. Validation by interp1.
 
