@@ -15,11 +15,11 @@ function h = densityalt(rho,varargin)
 %     atmosphereArgs - Cell array of additional arguments to pass to 
 %                      atmosphereFunction after the density input (e.g. for non-
 %                      standard atmospheres).
-%     method         - Method used for either searching for or interpolating a
-%                      solution (the equations that define the standard 
-%                      atmosphere cannot be inverted in terms of density).
-%                      Search: [fzero | bisection] (fzero only for scalar case)
-%                      Interpolate: any method accepted by interp1.
+%     method         - Method used for either solving, searching for, or
+%                      interpolating a solution.  Search:
+%                      [fzero | bisection | analytical]
+%                      (fzero only for scalar case)
+%                      Interpolate: any method accepted by interp1 e.g. 'pchip'.
 %                      Default method is 'pchip' for interpolation.
 %     options        - Options used for fzero or bisection methods.
 %     hMin           - For search: lower search interval bound in meters. 
@@ -87,8 +87,8 @@ p.addParameter('atmosphereFunction','atmos');
 p.addParameter('atmosphereArgs',{},@iscell);
 
 p.addParameter('method','pchip'); 
-% Possibilities are exact matches of 'fzero' or 'bisection', or an interp1
-% method. Validation by interp1.
+% Possibilities are exact matches of 'analytical', 'fzero' or 'bisection',
+% or an interp1 method. Validation by interp1.
 
 p.addParameter('hMin',0,@(x) validateattributes(x,{'numeric'},...
     {'scalar','finite','real'},'','altitude minimum h (m)'));
@@ -154,7 +154,10 @@ switch i.method
         
     case 'bisection'
         h = bisection(@myAtmo,i.hMin,i.hMax,rho,i.options{:});
-        
+
+    case 'analytical'
+        h = da_analytical_metric(rho);
+
     otherwise % interp1
         H = (i.hMin:i.spacing:i.hMax)';
         RHO = myAtmo(H);
@@ -170,5 +173,53 @@ elseif any(strcmpi(i.outputUnits,{'US','ft','feet'}))
     h = h / 0.3048;
 end
 % Otherwise, output h is already in meters.
+
+end
+
+function h = da_analytical_metric( rho )
+
+%  Lapse rate Base Temp       Base Geop. Alt    Base Pressure
+%   Ki (K/m)  Ti (K)          Hi (m)            P (Pa)
+D =[-0.0065   288.15          0                 101325            % Troposphere
+    0         216.65          11000             22632.04059693474 % Tropopause
+    0.001     216.65          20000             5474.877660660026 % Stratosph. 1
+    0.0028    228.65          32000             868.0158377493657 % Stratosph. 2
+    0         270.65          47000             110.9057845539146 % Stratopause
+    -0.0028   270.65          51000             66.938535373039073% Mesosphere 1
+    -0.002    214.65          71000             3.956392754582863 % Mesosphere 2
+    0         186.94590831019 84852.04584490575 .373377242877530];% Mesopause
+
+% Constants:
+rho0 = 1.225; % Sea level density, kg/m^3
+g0 = 9.80665; % m/sec^2
+
+K = D(:, 1); % K/m
+T = D(:, 2); % K
+H = D(:, 3); % m
+P = D(:, 4); % Pa
+
+R = P(1) / T(1) / rho0; % N-m/kg-K
+
+% Density at base of each atmosphere layer.
+rho_tab = P ./ (T * R);
+
+% Find index of base layer
+ibase = find( rho <= rho_tab, 1, 'last' );
+
+% Handle below sea level case
+if isempty( ibase )
+    ibase = 1;
+end
+
+% Density ratio to base of layer
+rhoonrhoi = rho ./ rho_tab(ibase);
+
+if K(ibase) == 0 % Isothermal layer
+    h = H(ibase) - log(rhoonrhoi) * R * T(ibase) / g0;
+else % Gradient layer
+    TonTi = rhoonrhoi .^ (-1.0 ./ (1.0 + g0 / (K(ibase) * R)));
+    Temp = TonTi * T(ibase);
+    h = H(ibase) + (Temp - T(ibase)) / K(ibase);
+end
 
 end
