@@ -63,21 +63,6 @@ end
 
 %% Find the altitude:
 
-h = da_analytical_metric(rho);
-
-%% Process output altitude from meters into desired units:
-if dimVarOut
-    h = h*u.m;
-elseif any(strcmpi(i.outputUnits,{'US','ft','feet'})) 
-    % Convert to imperial units if necessary.
-    h = h / 0.3048;
-end
-% Otherwise, output h is already in meters.
-
-end
-
-function h = da_analytical_metric( rho )
-
 %  Lapse rate Base Temp       Base Geop. Alt    Base Pressure
 %   Ki (K/m)  Ti (K)          Hi (m)            P (Pa)
 D =[-0.0065   288.15          0                 101325            % Troposphere
@@ -138,5 +123,14 @@ isomask = reshape(K(ibase) == 0, dim);
 
 % Place isothermal results in solution
 h(isomask) = hiso(isomask);
+
+%% Process output altitude from meters into desired units:
+if dimVarOut
+    h = h*u.m;
+elseif any(strcmpi(i.outputUnits,{'US','ft','feet'}))
+    % Convert to imperial units if necessary.
+    h = h / 0.3048;
+end
+% Otherwise, output h is already in meters.
 
 end
