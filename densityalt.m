@@ -104,22 +104,39 @@ R = P(1) / T(1) / rho0; % N-m/kg-K
 rho_tab = P ./ (T * R);
 
 % Find index of base layer
-ibase = find( rho <= rho_tab, 1, 'last' );
 
-% Handle below sea level case
-if isempty( ibase )
-    ibase = 1;
+dim = size(rho);
+
+% Initialize to layer one to handle below sea level cases.
+ibase = ones(dim);
+for ilayer = 1:length(rho_tab)
+    msk = rho <= rho_tab( ilayer );
+    ibase( msk ) = ilayer;
 end
+
+% Indexing like foo(ibase) results in a column vector when
+% ibase is a vector.  The proliferation of reshape in the following code
+% fights this to maintain a consistent shape whether the input is scalar,
+% column vector, row vector, or matrix.
 
 % Density ratio to base of layer
-rhoonrhoi = rho ./ rho_tab(ibase);
+rhoonrhoi = rho ./ reshape(rho_tab(ibase), dim);
 
-if K(ibase) == 0 % Isothermal layer
-    h = H(ibase) - log(rhoonrhoi) * R * T(ibase) / g0;
-else % Gradient layer
-    TonTi = rhoonrhoi .^ (-1.0 ./ (1.0 + g0 / (K(ibase) * R)));
-    Temp = TonTi * T(ibase);
-    h = H(ibase) + (Temp - T(ibase)) / K(ibase);
-end
+% It is easiest to calculate both the gradient and isothermal results for
+% all points and then index in the correct result after the computation.
+
+% Gradient layer
+TonTi = rhoonrhoi .^ (-1.0 ./ (1.0 + g0 ./ (reshape(K(ibase), dim) * R)));
+Temp = TonTi .* reshape(T(ibase), dim);
+h = reshape(H(ibase), dim) + (Temp - reshape(T(ibase), dim)) ./ reshape(K(ibase), dim);
+
+% Isothermal layer
+hiso = reshape(H(ibase), dim) - log(rhoonrhoi) .* R .* reshape(T(ibase), dim) ./ g0;
+
+% Mask to identify isothermal layers
+isomask = reshape(K(ibase) == 0, dim);
+
+% Place isothermal results in solution
+h(isomask) = hiso(isomask);
 
 end
